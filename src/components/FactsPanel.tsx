@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { METRO_FACTS } from "@/data/metro-facts";
 
 const ROTATE_MS = 3400;
+const FALLBACK_FACT = {
+  id: "fallback",
+  label: "Kochi Metro",
+  body: "A glowing line through the city, with a side quest waiting at every stop.",
+};
 
 interface FactsPanelProps {
   visible: boolean;
@@ -18,40 +23,26 @@ export default function FactsPanel({
   top = "clamp(2rem, 5vh, 3.5rem)",
 }: FactsPanelProps) {
   const [index, setIndex] = useState(0);
-  const [phase, setPhase] = useState<"in" | "out">("in");
   const indexRef = useRef(0);
+  const facts = METRO_FACTS.length > 0 ? METRO_FACTS : [FALLBACK_FACT];
 
   useEffect(() => {
     if (!visible) return;
 
     let cancelled = false;
-    let outTimer = 0;
-    let swapTimer = 0;
-
-    const scheduleNext = () => {
-      outTimer = window.setTimeout(() => {
-        if (cancelled) return;
-        setPhase("out");
-        swapTimer = window.setTimeout(() => {
-          if (cancelled) return;
-          indexRef.current = (indexRef.current + 1) % METRO_FACTS.length;
-          setIndex(indexRef.current);
-          setPhase("in");
-          scheduleNext();
-        }, 220);
-      }, ROTATE_MS);
-    };
-
-    scheduleNext();
+    const timer = window.setInterval(() => {
+      if (cancelled) return;
+      indexRef.current = (indexRef.current + 1) % facts.length;
+      setIndex(indexRef.current);
+    }, ROTATE_MS);
 
     return () => {
       cancelled = true;
-      window.clearTimeout(outTimer);
-      window.clearTimeout(swapTimer);
+      window.clearInterval(timer);
     };
-  }, [visible]);
+  }, [facts.length, visible]);
 
-  const fact = METRO_FACTS[index];
+  const fact = facts[index % facts.length] ?? FALLBACK_FACT;
 
   return (
     <aside
@@ -72,11 +63,8 @@ export default function FactsPanel({
 
         <div className="relative min-h-[7rem] overflow-hidden px-4 pb-4 pt-2">
           <div
-            className={`transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-              phase === "in"
-                ? "translate-y-0 opacity-100"
-                : "translate-y-2 opacity-0"
-            }`}
+            key={fact.id}
+            className="facts-content"
           >
             <p
               className="text-[1.35rem] leading-[0.95] tracking-[-0.04em] text-black"
