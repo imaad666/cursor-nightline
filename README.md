@@ -1,3 +1,5 @@
 # Kochi Metro Side Quests
 
-![beautiful face](images/IMG_1315-2.png)
+<p align="center">
+  <img src="images/IMG_1315-2.png" alt="beautiful face" width="200">
+</p>
