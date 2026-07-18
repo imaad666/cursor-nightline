@@ -31,9 +31,9 @@ import MetroLineZap from "./MetroLineZap";
 
 const STATION_ZOOM = 16;
 const OVERVIEW_ZOOM = 12;
-const CAMERA_MS = 780;
-const FOCUS_MS = 480;
-const ZOOM_STEP = 0.125;
+const CAMERA_MS = 900;
+const FOCUS_MS = 560;
+const PLACES_CACHE_TTL_MS = 10 * 60 * 1000;
 /** Fraction of the map height covered by the bottom carousel + chrome. */
 const DECK_COVER = 0.42;
 
@@ -78,24 +78,19 @@ function animateCamera(
 
   const from = { lat: startCenter.lat(), lng: startCenter.lng() };
   const t0 = performance.now();
-  let lastZoom = startZoom;
 
   const frame = (now: number) => {
     if (tokenRef.current !== token) return;
     const t = Math.min(1, (now - t0) / durationMs);
     const e = easeInOutCubic(t);
-    const easedZoom = startZoom + (target.zoom - startZoom) * e;
-    const nextZoom =
-      t === 1 ? target.zoom : Math.round(easedZoom / ZOOM_STEP) * ZOOM_STEP;
-
-    if (nextZoom !== lastZoom) lastZoom = nextZoom;
+    const nextZoom = startZoom + (target.zoom - startZoom) * e;
 
     map.moveCamera({
       center: {
         lat: from.lat + (target.center.lat - from.lat) * e,
         lng: from.lng + (target.center.lng - from.lng) * e,
       },
-      zoom: lastZoom,
+      zoom: nextZoom,
     });
     if (t < 1) requestAnimationFrame(frame);
   };
@@ -189,6 +184,16 @@ export default function MapCanvas() {
   const [placesError, setPlacesError] = useState<string | null>(null);
   const [placesRetry, setPlacesRetry] = useState(0);
   const [hoveredLine, setHoveredLine] = useState<LineId>(null);
+  const placesCacheRef = useRef(
+    new Map<
+      string,
+      {
+        expiresAt: number;
+        rated: Hotspot[];
+        closest: Hotspot[];
+      }
+    >(),
+  );
 
   const hotspots = spotMode === "rated" ? ratedSpots : closestSpots;
 
@@ -204,6 +209,18 @@ export default function MapCanvas() {
     }
 
     const station = selected;
+    const cacheKey = `${station.id}:${stationSearchRadius(station)}`;
+    const cached = placesCacheRef.current.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now() && placesRetry === 0) {
+      setRatedSpots(cached.rated);
+      setClosestSpots(cached.closest);
+      setActiveHotspotId(cached.rated[0]?.id ?? cached.closest[0]?.id ?? null);
+      setLoadingPlaces(false);
+      setPlacesError(null);
+      setSpotMode("rated");
+      return;
+    }
+
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 12000);
     setLoadingPlaces(true);
@@ -230,6 +247,11 @@ export default function MapCanvas() {
         };
       })
       .then(({ rated, closest }) => {
+        placesCacheRef.current.set(cacheKey, {
+          expiresAt: Date.now() + PLACES_CACHE_TTL_MS,
+          rated,
+          closest,
+        });
         setRatedSpots(rated);
         setClosestSpots(closest);
         setActiveHotspotId(rated[0]?.id ?? closest[0]?.id ?? null);
@@ -251,6 +273,7 @@ export default function MapCanvas() {
 
   const handleSelect = useCallback((station: MetroStation) => {
     setSelected(station);
+    setPlacesRetry(0);
     setHoveredLine(null);
   }, []);
 
@@ -291,6 +314,8 @@ export default function MapCanvas() {
         gestureHandling="greedy"
         disableDefaultUI
         clickableIcons={false}
+        isFractionalZoomEnabled
+        reuseMaps
         backgroundColor="#FFD54F"
         styles={lightMapStyles}
         className="h-full w-full"
