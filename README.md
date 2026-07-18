@@ -72,8 +72,7 @@ walking time from the selected station so the first stop stays practical.
 
 The Side Quests chat accepts requests such as:
 
-> I want to do sports at Vyttila, keep it cheap, stay close to the metro, and
-> find somewhere open until 9pm.
+> Vytilla station, first i want juice then i want to workout.
 
 The request becomes structured filters for station, interest, walking limit,
 budget, and opening time. Matching places are then returned to the map.
