@@ -136,9 +136,9 @@ export default function HotspotDeck({
   return (
     <div className="hotspot-sheet pointer-events-none absolute inset-x-0 bottom-0 z-20">
       <div className="pointer-events-auto w-full pb-[max(0.85rem,env(safe-area-inset-bottom))]">
-        <div className="mb-3 flex items-center justify-between gap-3 px-5 sm:px-8">
+        <div className="mx-auto mb-3 grid w-[calc(100%-2rem)] max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-3 sm:w-[calc(100%-4rem)]">
           <div
-            className="comic-panel flex shrink-0 overflow-hidden bg-[#FFD54F] p-1"
+            className="comic-panel col-start-2 flex shrink-0 overflow-hidden bg-[#FFD54F] p-1"
             role="tablist"
             aria-label="Spot ranking"
           >
@@ -172,7 +172,7 @@ export default function HotspotDeck({
           <button
             type="button"
             onClick={onClose}
-            className="comic-panel shrink-0 bg-black px-3.5 py-2.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#FFD54F] transition hover:bg-[#FFD54F] hover:text-black"
+            className="comic-panel col-start-3 justify-self-end bg-black px-3.5 py-2.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#FFD54F] transition hover:bg-[#FFD54F] hover:text-black"
           >
             Close
           </button>
