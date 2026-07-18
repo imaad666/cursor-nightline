@@ -1,3 +1,5 @@
+ignore Naming Typo
+
 # Kochi Metro Side Quests
 
 <p align="center">
