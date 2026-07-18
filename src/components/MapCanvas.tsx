@@ -20,6 +20,7 @@ import PlaceLabels from "./PlaceLabels";
 import FactsPanel from "./FactsPanel";
 import HotspotMarkers from "./HotspotMarkers";
 import HotspotDeck, { type SpotMode } from "./HotspotDeck";
+import SideQuestChat, { type SideQuestPlan } from "./SideQuestChat";
 import WalkRoutes from "./WalkRoutes";
 import {
   BlueMetroLine,
@@ -184,6 +185,7 @@ export default function MapCanvas() {
   const [placesError, setPlacesError] = useState<string | null>(null);
   const [placesRetry, setPlacesRetry] = useState(0);
   const [hoveredLine, setHoveredLine] = useState<LineId>(null);
+  const pendingSideQuestRef = useRef<SideQuestPlan | null>(null);
   const placesCacheRef = useRef(
     new globalThis.Map<
       string,
@@ -211,6 +213,19 @@ export default function MapCanvas() {
     }
 
     const station = selected;
+    const pendingPlan = pendingSideQuestRef.current;
+    if (pendingPlan?.stationId === station.id) {
+      pendingSideQuestRef.current = null;
+      setRatedSpots(pendingPlan.spots);
+      setClosestSpots(pendingPlan.spots);
+      setAllSpots(pendingPlan.spots);
+      setActiveHotspotId(pendingPlan.spots[0]?.id ?? null);
+      setLoadingPlaces(false);
+      setPlacesError(null);
+      setSpotMode("rated");
+      return;
+    }
+
     const cacheKey = `${station.id}:${stationSearchRadius(station)}`;
     const cached = placesCacheRef.current.get(cacheKey);
     if (cached && cached.expiresAt > Date.now() && placesRetry === 0) {
@@ -308,6 +323,31 @@ export default function MapCanvas() {
   const handleHotspotSelect = useCallback((hotspot: Hotspot) => {
     setActiveHotspotId(hotspot.id);
   }, []);
+
+  const handleSideQuestPlan = useCallback(
+    (plan: SideQuestPlan) => {
+      const station = ALL_MAP_STATIONS.find(
+        (candidate) => candidate.id === plan.stationId,
+      );
+      if (!station) return;
+
+      pendingSideQuestRef.current = plan;
+      setPlacesRetry(0);
+      setHoveredLine(null);
+      if (selected?.id === station.id) {
+        pendingSideQuestRef.current = null;
+        setRatedSpots(plan.spots);
+        setClosestSpots(plan.spots);
+        setAllSpots(plan.spots);
+        setActiveHotspotId(plan.spots[0]?.id ?? null);
+        setLoadingPlaces(false);
+        setPlacesError(null);
+        setSpotMode("rated");
+      }
+      setSelected(station);
+    },
+    [selected],
+  );
 
   const handleModeChange = useCallback(
     (mode: SpotMode) => {
@@ -451,6 +491,11 @@ export default function MapCanvas() {
           </div>
         </div>
       )}
+
+      <SideQuestChat
+        selectedStationId={selected?.id ?? null}
+        onPlan={handleSideQuestPlan}
+      />
 
       {selected && (
         <HotspotDeck
