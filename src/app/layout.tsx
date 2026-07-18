@@ -14,8 +14,8 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "METRO — Kochi",
-  description: "Date spots along the Kochi Metro Blue Line.",
+  title: "Kochi Metro Side Quests",
+  description: "All you need is this app, and metro.",
   icons: {
     icon: [{ url: "/metro-logo.png", type: "image/png" }],
     shortcut: ["/metro-logo.png"],
