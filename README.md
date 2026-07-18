@@ -13,10 +13,5 @@ GOOGLE_MAPS_KEY=your_google_maps_key
 OPENAI_API_KEY=your_openai_api_key
 ```
 
-Keep both keys in `.env.local`; never commit or expose them in client-side code.
-The previously exposed OpenAI key must be revoked and replaced.
+Keep both keys in `.env.local`
 
-In Google Cloud Console, restrict the Maps key by API and website referrer:
-
-- Enable only Maps JavaScript API, Places API, and Routes API.
-- Allow your local development origin and exact production domain.
