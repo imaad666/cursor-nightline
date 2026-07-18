@@ -142,6 +142,16 @@ body {
   z-index: 200;
 }
 
+:where(button, [role="button"], [tabindex]):focus-visible {
+  outline: 3px solid #7eeaea;
+  outline-offset: 4px;
+}
+
+.station-node:focus-visible:not(:disabled) {
+  outline: 3px solid #000;
+  outline-offset: 6px;
+}
+
 .station-node.is-selected {
   z-index: 150;
   opacity: 1;
@@ -691,6 +701,37 @@ body {
 .hotspot-card.is-side:hover {
   filter: blur(1px) saturate(0.9);
   opacity: 0.82;
+}
+
+.station-discovery-dot {
+  animation: station-discovery-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes station-discovery-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(2, 176, 175, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(2, 176, 175, 0);
+  }
+}
+
+@media (max-width: 639px) {
+  .hotspot-sheet {
+    padding-top: 1rem;
+  }
+
+  .hotspot-scroller {
+    gap: 0.75rem;
+    padding-left: max(1rem, calc(50vw - min(41vw, 160px)));
+    padding-right: max(1rem, calc(50vw - min(41vw, 160px)));
+    scroll-padding-inline: max(1rem, calc(50vw - min(41vw, 160px)));
+  }
+
+  .hotspot-card {
+    width: min(82vw, 320px);
+  }
 }
 
 .chrome-fade-in {

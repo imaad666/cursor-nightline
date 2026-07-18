@@ -23,7 +23,6 @@ import HotspotDeck, { type SpotMode } from "./HotspotDeck";
 import WalkRoutes from "./WalkRoutes";
 import {
   BlueMetroLine,
-  MetroLineHoverLabel,
   PinkMetroLineFuture,
   type LineId,
 } from "./MetroLine";
@@ -34,9 +33,6 @@ const OVERVIEW_ZOOM = 12;
 const CAMERA_MS = 900;
 const FOCUS_MS = 560;
 const PLACES_CACHE_TTL_MS = 10 * 60 * 1000;
-/** Fraction of the map height covered by the bottom carousel + chrome. */
-const DECK_COVER = 0.42;
-
 function easeInOutCubic(t: number) {
   return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
 }
@@ -51,8 +47,11 @@ function deckAwareCenter(
   zoom: number,
 ): { lat: number; lng: number } {
   const h = map.getDiv()?.clientHeight || window.innerHeight;
-  const deckPx = Math.min(h * DECK_COVER, 380);
-  const clearMidFromTop = (h - deckPx) / 2;
+  const deckHeight = document
+    .querySelector<HTMLElement>(".hotspot-sheet")
+    ?.getBoundingClientRect().height;
+  const deckPx = deckHeight ?? Math.min(h * 0.42, 380);
+  const clearMidFromTop = Math.max(0, (h - Math.min(deckPx, h)) / 2);
   const shiftPx = h / 2 - clearMidFromTop;
 
   const metersPerPx =
@@ -287,6 +286,16 @@ export default function MapCanvas() {
     setPlacesRetry(0);
   }, []);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !selected) return;
+      event.preventDefault();
+      handleClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleClose, selected]);
+
   const handleHotspotSelect = useCallback((hotspot: Hotspot) => {
     setActiveHotspotId(hotspot.id);
   }, []);
@@ -346,6 +355,7 @@ export default function MapCanvas() {
               station={selected}
               hotspots={hotspots}
               activeId={activeHotspotId}
+              animationKey={`${selected.id}:${spotMode}:${hotspots.map((hotspot) => hotspot.id).join(",")}`}
             />
             <HotspotMarkers
               hotspots={hotspots}
@@ -361,8 +371,6 @@ export default function MapCanvas() {
 
       <div className="comic-halftone pointer-events-none absolute inset-0 z-[7]" />
       <div className="comic-vignette pointer-events-none absolute inset-0 z-[8]" />
-
-      <MetroLineHoverLabel line={hoveredLine} anchorRef={pageRef} />
 
       <header
         className="pointer-events-none absolute left-0 top-0 z-10 flex items-start"
@@ -425,6 +433,15 @@ export default function MapCanvas() {
       </div>
 
       <FactsPanel visible={!selected} inset={CHROME_INSET} top={CHROME_TOP} />
+
+      {!selected && (
+        <div className="station-discovery-hint pointer-events-none absolute bottom-[clamp(1.5rem,10vh,6rem)] left-1/2 z-10 -translate-x-1/2 text-center">
+          <div className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-[#FFD54F]/95 px-3 py-2 text-[10px] font-black uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] sm:px-4 sm:text-[11px]">
+            <span className="station-discovery-dot h-2 w-2 rounded-full bg-[#02B0AF]" />
+            Zoom in or touch the glowing line to reveal stops
+          </div>
+        </div>
+      )}
 
       {selected && (
         <HotspotDeck
