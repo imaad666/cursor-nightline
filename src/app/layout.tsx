@@ -16,6 +16,11 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: "METRO — Kochi",
   description: "Date spots along the Kochi Metro Blue Line.",
+  icons: {
+    icon: [{ url: "/metro-logo.png", type: "image/png" }],
+    shortcut: ["/metro-logo.png"],
+    apple: [{ url: "/metro-logo.png", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({
