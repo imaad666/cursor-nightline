@@ -13,24 +13,110 @@ import {
 
 export const runtime = "nodejs";
 
-const DATE_TYPES = [
-  "cafe",
-  "coffee_shop",
-  "restaurant",
-  "movie_theater",
-  "park",
-  "bakery",
-  "ice_cream_shop",
-  "dessert_shop",
-  "bar",
-  "museum",
-  "art_gallery",
-  "book_store",
-  "tourist_attraction",
-  "shopping_mall",
-  "amusement_center",
-  "bowling_alley",
+const PLACE_TYPE_GROUPS = [
+  {
+    name: "food",
+    types: [
+      "cafe",
+      "coffee_shop",
+      "restaurant",
+      "bakery",
+      "ice_cream_shop",
+      "dessert_shop",
+      "chocolate_shop",
+      "cat_cafe",
+      "tea_store",
+      "food_court",
+      "fine_dining_restaurant",
+    ],
+  },
+  {
+    name: "social",
+    types: [
+      "bar",
+      "night_club",
+      "live_music_venue",
+      "comedy_club",
+      "karaoke",
+      "cocktail_bar",
+      "brewery",
+      "brewpub",
+      "beer_garden",
+      "gastropub",
+      "bowling_alley",
+      "internet_cafe",
+      "event_venue",
+    ],
+  },
+  {
+    name: "culture",
+    types: [
+      "art_gallery",
+      "art_museum",
+      "art_studio",
+      "auditorium",
+      "concert_hall",
+      "cultural_center",
+      "cultural_landmark",
+      "history_museum",
+      "museum",
+      "performing_arts_theater",
+      "library",
+      "planetarium",
+    ],
+  },
+  {
+    name: "activities",
+    types: [
+      "aquarium",
+      "amusement_center",
+      "amusement_park",
+      "go_karting_venue",
+      "indoor_playground",
+      "miniature_golf_course",
+      "movie_theater",
+      "paintball_center",
+      "video_arcade",
+      "fitness_center",
+      "gym",
+      "sports_club",
+      "sports_complex",
+      "swimming_pool",
+    ],
+  },
+  {
+    name: "outdoors",
+    types: [
+      "botanical_garden",
+      "city_park",
+      "dog_park",
+      "garden",
+      "hiking_area",
+      "national_park",
+      "observation_deck",
+      "park",
+      "picnic_ground",
+      "plaza",
+      "tourist_attraction",
+    ],
+  },
+  {
+    name: "shopping",
+    types: [
+      "book_store",
+      "clothing_store",
+      "department_store",
+      "farmers_market",
+      "flea_market",
+      "gift_shop",
+      "market",
+      "shopping_mall",
+      "thrift_store",
+    ],
+  },
 ] as const;
+
+const MAX_RESULTS_PER_GROUP = 8;
 
 const REQUEST_TIMEOUT_MS = 8000;
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -40,6 +126,7 @@ const RATE_LIMIT = 30;
 type NearbyPayload = {
   rated: Hotspot[];
   closest: Hotspot[];
+  all: Hotspot[];
   hotspots: Hotspot[];
 };
 
@@ -61,6 +148,8 @@ interface PlacesNearbyResponse {
     shortFormattedAddress?: string;
     editorialSummary?: { text?: string };
     googleMapsUri?: string;
+    priceLevel?: string;
+    regularOpeningHours?: { weekdayDescriptions?: string[] };
     photos?: Array<{
       name?: string;
       authorAttributions?: Array<{ displayName?: string }>;
@@ -69,15 +158,81 @@ interface PlacesNearbyResponse {
   error?: { message?: string; status?: string };
 }
 
+type PlaceResult = NonNullable<PlacesNearbyResponse["places"]>[number];
+
 interface RouteMatrixElement {
   destinationIndex?: number;
   duration?: string;
   condition?: string;
 }
 
+async function searchNearbyGroup(
+  apiKey: string,
+  center: { lat: number; lng: number },
+  radius: number,
+  types: readonly string[],
+) {
+  const response = await fetchWithTimeout(
+    "https://places.googleapis.com/v1/places:searchNearby",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": [
+          "places.id",
+          "places.displayName",
+          "places.location",
+          "places.types",
+          "places.primaryType",
+          "places.photos",
+          "places.rating",
+          "places.userRatingCount",
+          "places.shortFormattedAddress",
+          "places.editorialSummary",
+          "places.googleMapsUri",
+          "places.priceLevel",
+          "places.regularOpeningHours.weekdayDescriptions",
+        ].join(","),
+      },
+      body: JSON.stringify({
+        includedTypes: [...types],
+        maxResultCount: MAX_RESULTS_PER_GROUP,
+        rankPreference: "POPULARITY",
+        locationRestriction: {
+          circle: {
+            center: { latitude: center.lat, longitude: center.lng },
+            radius,
+          },
+        },
+      }),
+      cache: "no-store",
+    },
+  );
+
+  const data = (await response.json()) as PlacesNearbyResponse;
+  if (!response.ok) {
+    throw new Error(
+      data.error?.message ?? "Places Nearby Search failed",
+    );
+  }
+  return data.places ?? [];
+}
+
 function parseDurationSeconds(duration?: string) {
   const seconds = Number(duration?.replace(/s$/, ""));
   return Number.isFinite(seconds) ? seconds : null;
+}
+
+function normalizePriceLevel(value?: string) {
+  const levels: Record<string, number> = {
+    PRICE_LEVEL_FREE: 0,
+    PRICE_LEVEL_INEXPENSIVE: 1,
+    PRICE_LEVEL_MODERATE: 2,
+    PRICE_LEVEL_EXPENSIVE: 3,
+    PRICE_LEVEL_VERY_EXPENSIVE: 4,
+  };
+  return value ? levels[value] : undefined;
 }
 
 async function walkingMinutesFromRoutes(
@@ -155,6 +310,31 @@ function scoreRated(h: Hotspot) {
   const walkSweet =
     h.walkMins >= 5 && h.walkMins <= 22 ? 0.2 : h.walkMins < 4 ? -0.35 : 0;
   return quality + photo + walkSweet;
+}
+
+function selectDiverseRated(spots: Hotspot[], limit = 8) {
+  const selected: Hotspot[] = [];
+  const tagCounts = new globalThis.Map<string, number>();
+  const sorted = [...spots].sort((a, b) => {
+    const diff = scoreRated(b) - scoreRated(a);
+    if (Math.abs(diff) > 0.01) return diff;
+    return (b.rating ?? 0) - (a.rating ?? 0);
+  });
+
+  for (const spot of sorted) {
+    const count = tagCounts.get(spot.tag) ?? 0;
+    if (count >= 2) continue;
+    selected.push(spot);
+    tagCounts.set(spot.tag, count + 1);
+    if (selected.length === limit) return selected;
+  }
+
+  for (const spot of sorted) {
+    if (selected.some((selectedSpot) => selectedSpot.id === spot.id)) continue;
+    selected.push(spot);
+    if (selected.length === limit) break;
+  }
+  return selected;
 }
 
 async function fetchWithTimeout(
@@ -281,57 +461,34 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const res = await fetchWithTimeout(
-      "https://places.googleapis.com/v1/places:searchNearby",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": apiKey,
-          "X-Goog-FieldMask": [
-            "places.id",
-            "places.displayName",
-            "places.location",
-            "places.types",
-            "places.primaryType",
-            "places.photos",
-            "places.rating",
-            "places.userRatingCount",
-            "places.shortFormattedAddress",
-            "places.editorialSummary",
-            "places.googleMapsUri",
-          ].join(","),
-        },
-        body: JSON.stringify({
-          includedTypes: [...DATE_TYPES],
-          maxResultCount: 20,
-          rankPreference: "POPULARITY",
-          locationRestriction: {
-            circle: {
-              center: { latitude: lat, longitude: lng },
-              radius,
-            },
-          },
-        }),
-        cache: "no-store",
-      },
+    const groupResults = await Promise.allSettled(
+      PLACE_TYPE_GROUPS.map((group) =>
+        searchNearbyGroup(apiKey, { lat, lng }, radius, group.types),
+      ),
+    );
+    const placesById = new globalThis.Map<string, PlaceResult>();
+    const failures = groupResults.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
     );
 
-    const data = (await res.json()) as PlacesNearbyResponse;
+    for (const result of groupResults) {
+      if (result.status !== "fulfilled") continue;
+      for (const place of result.value) {
+        if (place.id) placesById.set(place.id, place);
+      }
+    }
 
-    if (!res.ok) {
-      return NextResponse.json(
-        {
-          error: data.error?.message ?? "Places Nearby Search failed",
-          status: data.error?.status,
-        },
-        { status: res.status },
-      );
+    if (placesById.size === 0 && failures.length === PLACE_TYPE_GROUPS.length) {
+      const message =
+        failures[0]?.reason instanceof Error
+          ? failures[0].reason.message
+          : "Places Nearby Search failed";
+      return NextResponse.json({ error: message }, { status: 502 });
     }
 
     const station = { lat, lng };
 
-    const mapped = (data.places ?? [])
+    const mapped = [...placesById.values()]
       .map((place) => {
         const placeLat = place.location?.latitude;
         const placeLng = place.location?.longitude;
@@ -368,6 +525,8 @@ export async function GET(request: NextRequest) {
           blurb,
           rating: place.rating,
           ratingCount: place.userRatingCount,
+          priceLevel: normalizePriceLevel(place.priceLevel),
+          openingHours: place.regularOpeningHours?.weekdayDescriptions,
           address: place.shortFormattedAddress,
           mapsUri: place.googleMapsUri,
           photoAttribution: photo?.authorAttributions?.[0]?.displayName,
@@ -401,13 +560,7 @@ export async function GET(request: NextRequest) {
     if (ratedPool.length < 3) {
       ratedPool = stationOwned.filter((h) => h.walkMins <= 28);
     }
-    const rated = [...ratedPool]
-      .sort((a, b) => {
-        const diff = scoreRated(b) - scoreRated(a);
-        if (Math.abs(diff) > 0.01) return diff;
-        return (b.rating ?? 0) - (a.rating ?? 0);
-      })
-      .slice(0, 5);
+    const rated = selectDiverseRated(ratedPool);
 
     // Closest — nearest walk first, rating as tiebreak
     const closest = [...stationOwned]
@@ -417,11 +570,12 @@ export async function GET(request: NextRequest) {
         if (walk !== 0) return walk;
         return (b.rating ?? 0) - (a.rating ?? 0);
       })
-      .slice(0, 5);
+      .slice(0, 8);
 
     const payload: NearbyPayload = {
       rated,
       closest,
+      all: stationOwned,
       // Back-compat for anything still reading hotspots
       hotspots: rated,
     };
