@@ -3,7 +3,7 @@ ignore Naming Typo
 # Kochi Metro Side Quests
 
 <p align="center">
-  <a href="https://codex-sidequest.vercel.app"><strong>Live demo →</strong></a>
+  <a href="https://codex-sidequest.vercel.app"><strong>Live on Web - Kochi Metro Side Quests</strong></a>
 </p>
 
 <p align="center">
