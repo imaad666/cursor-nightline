@@ -60,6 +60,7 @@ export function BlueMetroLine({
     ? {
         onMouseOver: () => onHover("blue"),
         onMouseOut: () => onHover(null),
+        onClick: () => onHover("blue"),
       }
     : {};
 
@@ -126,6 +127,7 @@ export function PinkMetroLineFuture({
     ? {
         onMouseOver: () => onHover("pink"),
         onMouseOut: () => onHover(null),
+        onClick: () => onHover("pink"),
       }
     : {};
 
