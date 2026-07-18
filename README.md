@@ -1,3 +1,3 @@
 # cursor-nightline
 
-![Uploaded image](images/IMG_1315-2.HEIC)
+![beautiful face](images/IMG_1315-2.png)
