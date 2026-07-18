@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  distanceMetersBetween,
   kindFromTag,
   tagFromPlaceTypes,
   walkMinsBetween,
@@ -52,6 +53,84 @@ interface PlacesNearbyResponse {
   error?: { message?: string; status?: string };
 }
 
+interface RouteMatrixElement {
+  destinationIndex?: number;
+  duration?: string;
+  condition?: string;
+}
+
+function parseDurationSeconds(duration?: string) {
+  const seconds = Number(duration?.replace(/s$/, ""));
+  return Number.isFinite(seconds) ? seconds : null;
+}
+
+async function walkingMinutesFromRoutes(
+  apiKey: string,
+  origin: { lat: number; lng: number },
+  destinations: Array<{ lat: number; lng: number }>,
+) {
+  if (destinations.length === 0) return new Map<number, number>();
+
+  const waypoint = (point: { lat: number; lng: number }) => ({
+    waypoint: {
+      location: {
+        latLng: {
+          latitude: point.lat,
+          longitude: point.lng,
+        },
+      },
+    },
+  });
+
+  const response = await fetch(
+    "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask":
+          "destinationIndex,duration,condition",
+      },
+      body: JSON.stringify({
+        origins: [waypoint(origin)],
+        destinations: destinations.map(waypoint),
+        travelMode: "WALK",
+      }),
+      cache: "no-store",
+    },
+  );
+
+  const body = await response.text();
+  if (!response.ok) {
+    throw new Error(
+      `Routes API returned ${response.status}: ${body.slice(0, 200)}`,
+    );
+  }
+
+  const elements: RouteMatrixElement[] = body.trim().startsWith("[")
+    ? (JSON.parse(body) as RouteMatrixElement[])
+    : body
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as RouteMatrixElement);
+
+  return new Map(
+    elements.flatMap((element) => {
+      const index = element.destinationIndex;
+      const seconds = parseDurationSeconds(element.duration);
+      if (
+        index == null ||
+        seconds == null ||
+        element.condition !== "ROUTE_EXISTS"
+      ) {
+        return [];
+      }
+      return [[index, Math.max(1, Math.ceil(seconds / 60))] as const];
+    }),
+  );
+}
+
 function scoreRated(h: Hotspot) {
   const rating = h.rating ?? 0;
   const reviews = h.ratingCount ?? 0;
@@ -60,6 +139,23 @@ function scoreRated(h: Hotspot) {
   const walkSweet =
     h.walkMins >= 5 && h.walkMins <= 22 ? 0.2 : h.walkMins < 4 ? -0.35 : 0;
   return quality + photo + walkSweet;
+}
+
+function belongsToStation(hotspot: Hotspot, stationId: string) {
+  const operationalStations = ALL_MAP_STATIONS.filter(
+    (station) => station.status === "operational",
+  );
+  const nearest = operationalStations.reduce<{
+    id: string;
+    distance: number;
+  } | null>((closest, station) => {
+    const distance = distanceMetersBetween(hotspot, station);
+    return !closest || distance < closest.distance
+      ? { id: station.id, distance }
+      : closest;
+  }, null);
+
+  return nearest?.id === stationId;
 }
 
 export async function GET(request: NextRequest) {
@@ -188,12 +284,30 @@ export async function GET(request: NextRequest) {
       })
       .filter((h): h is Hotspot => h != null);
 
+    const stationOwned = stationMeta
+      ? mapped.filter((hotspot) => belongsToStation(hotspot, stationId))
+      : mapped;
+
+    try {
+      const routeMinutes = await walkingMinutesFromRoutes(
+        apiKey,
+        station,
+        stationOwned.map((hotspot) => ({ lat: hotspot.lat, lng: hotspot.lng })),
+      );
+      for (const [index, minutes] of routeMinutes) {
+        const hotspot = stationOwned[index];
+        if (hotspot) hotspot.walkMins = minutes;
+      }
+    } catch (err) {
+      console.warn("Routes API walking matrix unavailable", err);
+    }
+
     // Top rated — quality first, real short walk preferred
-    let ratedPool = mapped.filter(
+    let ratedPool = stationOwned.filter(
       (h) => h.walkMins >= 3 && h.walkMins <= 28,
     );
     if (ratedPool.length < 3) {
-      ratedPool = mapped.filter((h) => h.walkMins <= 28);
+      ratedPool = stationOwned.filter((h) => h.walkMins <= 28);
     }
     const rated = [...ratedPool]
       .sort((a, b) => {
@@ -204,7 +318,7 @@ export async function GET(request: NextRequest) {
       .slice(0, 5);
 
     // Closest — nearest walk first, rating as tiebreak
-    const closest = [...mapped]
+    const closest = [...stationOwned]
       .filter((h) => h.walkMins <= 20)
       .sort((a, b) => {
         const walk = a.walkMins - b.walkMins;

@@ -106,8 +106,7 @@ export function kindFromTag(tag: HotspotTag): PlaceKind {
   return TAG_KIND[tag];
 }
 
-/** Rough walking minutes from lat/lng delta (≈ 80 m/min). */
-export function walkMinsBetween(
+export function distanceMetersBetween(
   a: { lat: number; lng: number },
   b: { lat: number; lng: number },
 ): number {
@@ -121,7 +120,15 @@ export function walkMinsBetween(
     Math.sin(dLat / 2) ** 2 +
     Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
   const meters = 2 * R * Math.asin(Math.sqrt(h));
-  return Math.max(1, Math.round(meters / 80));
+  return meters;
+}
+
+/** Fallback estimate used only when Google Routes cannot return a duration. */
+export function walkMinsBetween(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
+  return Math.max(1, Math.round(distanceMetersBetween(a, b) / 80));
 }
 
 /** Open Google Maps walking directions from A → B. */
