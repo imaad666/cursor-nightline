@@ -94,9 +94,9 @@ export default function SideQuestChat({
   };
 
   return (
-    <div
-      className={`sidequest-shell ${open ? "is-open" : ""} ${selectedStationId ? "has-selection" : ""}`}
-    >
+    if (selectedStationId) return null;
+
+    return <div className={`sidequest-shell ${open ? "is-open" : ""}`}>
       {open && (
         <section className="sidequest-panel comic-panel" aria-label="Side Quests chat">
           <header className="sidequest-header">
@@ -169,6 +169,6 @@ export default function SideQuestChat({
           Customize your own sidequest
         </button>
       )}
-    </div>
+    </div>;
   );
 }

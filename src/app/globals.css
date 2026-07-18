@@ -706,15 +706,10 @@ body {
 /* —— Side Quests chat —— */
 .sidequest-shell {
   position: absolute;
-  right: clamp(1.25rem, 7vw, 6rem);
+  left: 50%;
   bottom: calc(clamp(1.5rem, 10vh, 6rem) + 3.75rem);
   z-index: 30;
-}
-
-.sidequest-shell.has-selection {
-  top: 50%;
-  bottom: auto;
-  transform: translateY(-50%);
+  transform: translateX(-50%);
 }
 
 .sidequest-launcher {
@@ -917,20 +912,15 @@ body {
 @media (max-width: 639px) {
   .sidequest-shell {
     top: auto;
-    right: 1rem;
+    left: 50%;
     bottom: calc(max(1rem, env(safe-area-inset-bottom)) + 3.75rem);
+    transform: translateX(-50%);
   }
 
   .sidequest-shell.is-open {
-    right: 0.75rem;
+    left: 50%;
     bottom: calc(max(0.75rem, env(safe-area-inset-bottom)) + 3.75rem);
-  }
-
-  .sidequest-shell.has-selection,
-  .sidequest-shell.has-selection.is-open {
-    top: auto;
-    bottom: max(0.75rem, env(safe-area-inset-bottom));
-    transform: none;
+    transform: translateX(-50%);
   }
 
   .sidequest-panel {

@@ -10,13 +10,17 @@ import PlaceKindIcon from "./PlaceKindIcon";
 interface HotspotMarkersProps {
   hotspots: Hotspot[];
   activeId: string | null;
+  plannedIds: string[];
   onSelect: (hotspot: Hotspot) => void;
+  onTogglePlan: (hotspot: Hotspot) => void;
 }
 
 export default function HotspotMarkers({
   hotspots,
   activeId,
+  plannedIds,
   onSelect,
+  onTogglePlan,
 }: HotspotMarkersProps) {
   const map = useMap();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -27,6 +31,8 @@ export default function HotspotMarkers({
   const [ready, setReady] = useState(false);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onTogglePlanRef = useRef(onTogglePlan);
+  onTogglePlanRef.current = onTogglePlan;
 
   useEffect(() => {
     if (!map) return;
@@ -99,13 +105,14 @@ export default function HotspotMarkers({
   return createPortal(
     <>
       {hotspots.map((spot, i) => (
-        <button
+        <div
           key={spot.id}
           ref={(el) => {
             if (el) nodeRefs.current.set(spot.id, el);
             else nodeRefs.current.delete(spot.id);
           }}
-          type="button"
+          role="button"
+          tabIndex={0}
           aria-label={`${spot.tag}: ${spot.name}`}
           className={[
             "hotspot-node",
@@ -118,6 +125,11 @@ export default function HotspotMarkers({
             e.stopPropagation();
             onSelectRef.current(spot);
           }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.preventDefault();
+            onSelectRef.current(spot);
+          }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <span
@@ -128,12 +140,31 @@ export default function HotspotMarkers({
             <span className="hotspot-pin" aria-hidden>
               <PlaceKindIcon kind={spot.kind ?? kindFromTag(spot.tag)} className="hotspot-pin-icon" />
             </span>
+            <span
+              className={`hotspot-add ${plannedIds.includes(spot.id) ? "is-added" : ""}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`${plannedIds.includes(spot.id) ? "Remove" : "Add"} ${spot.name} ${plannedIds.includes(spot.id) ? "from" : "to"} plan`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePlanRef.current(spot);
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                e.preventDefault();
+                e.stopPropagation();
+                onTogglePlanRef.current(spot);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {plannedIds.includes(spot.id) ? "✓" : "+"}
+            </span>
             <span className="hotspot-tip">
               <span className="hotspot-tip-tag">{spot.tag}</span>
               {spot.name}
             </span>
           </span>
-        </button>
+        </div>
       ))}
     </>,
     containerRef.current,

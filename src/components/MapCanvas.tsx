@@ -1,7 +1,7 @@
 "use client";
 
 import { Map, useMap } from "@vis.gl/react-google-maps";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ALL_MAP_STATIONS,
   FUTURE_COUNT,
@@ -13,7 +13,7 @@ import {
   stationSearchRadius,
   type MetroStation,
 } from "@/data/kochi-metro";
-import type { Hotspot } from "@/data/hotspots";
+import { mapsWalkingPlanUrl, type Hotspot } from "@/data/hotspots";
 import { lightMapStyles } from "@/lib/map-styles";
 import StationMarkers from "./StationMarkers";
 import PlaceLabels from "./PlaceLabels";
@@ -179,6 +179,7 @@ export default function MapCanvas() {
   const [spotMode, setSpotMode] = useState<SpotMode>("rated");
   const [ratedSpots, setRatedSpots] = useState<Hotspot[]>([]);
   const [closestSpots, setClosestSpots] = useState<Hotspot[]>([]);
+  const [plannedHotspotIds, setPlannedHotspotIds] = useState<string[]>([]);
   const [activeHotspotId, setActiveHotspotId] = useState<string | null>(null);
   const [loadingPlaces, setLoadingPlaces] = useState(false);
   const [placesError, setPlacesError] = useState<string | null>(null);
@@ -197,12 +198,28 @@ export default function MapCanvas() {
   );
 
   const hotspots = spotMode === "rated" ? ratedSpots : closestSpots;
+  const allSpots = useMemo(
+    () => [...ratedSpots, ...closestSpots].filter((spot, index, list) =>
+      list.findIndex((candidate) => candidate.id === spot.id) === index,
+    ),
+    [ratedSpots, closestSpots],
+  );
+  const plannedHotspots = plannedHotspotIds
+    .map((id) => allSpots.find((spot) => spot.id === id))
+    .filter((spot): spot is Hotspot => spot != null);
+  const planUrl = selected && plannedHotspots.length > 0
+    ? mapsWalkingPlanUrl(
+        { lat: selected.lat, lng: selected.lng },
+        plannedHotspots,
+      )
+    : null;
 
   useEffect(() => {
     if (!selected) {
       setRatedSpots([]);
       setClosestSpots([]);
       setActiveHotspotId(null);
+      setPlannedHotspotIds([]);
       setPlacesError(null);
       setLoadingPlaces(false);
       setSpotMode("rated");
@@ -216,6 +233,7 @@ export default function MapCanvas() {
       setRatedSpots(pendingPlan.spots);
       setClosestSpots(pendingPlan.spots);
       setActiveHotspotId(pendingPlan.spots[0]?.id ?? null);
+      setPlannedHotspotIds([]);
       setLoadingPlaces(false);
       setPlacesError(null);
       setSpotMode("rated");
@@ -228,6 +246,7 @@ export default function MapCanvas() {
       setRatedSpots(cached.rated);
       setClosestSpots(cached.closest);
       setActiveHotspotId(cached.rated[0]?.id ?? cached.closest[0]?.id ?? null);
+      setPlannedHotspotIds([]);
       setLoadingPlaces(false);
       setPlacesError(null);
       setSpotMode("rated");
@@ -241,6 +260,7 @@ export default function MapCanvas() {
     setRatedSpots([]);
     setClosestSpots([]);
     setActiveHotspotId(null);
+    setPlannedHotspotIds([]);
     setSpotMode("rated");
 
     const url = `/api/places/nearby?lat=${station.lat}&lng=${station.lng}&stationId=${encodeURIComponent(station.id)}&radius=${stationSearchRadius(station)}`;
@@ -295,6 +315,7 @@ export default function MapCanvas() {
     setRatedSpots([]);
     setClosestSpots([]);
     setActiveHotspotId(null);
+    setPlannedHotspotIds([]);
     setPlacesError(null);
     setSpotMode("rated");
     setPlacesRetry(0);

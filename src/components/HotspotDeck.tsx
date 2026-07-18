@@ -17,6 +17,9 @@ interface HotspotDeckProps {
   mode: SpotMode;
   onModeChange: (mode: SpotMode) => void;
   onActiveChange: (hotspot: Hotspot) => void;
+  plannedIds: string[];
+  planUrl: string | null;
+  onTogglePlan: (hotspot: Hotspot) => void;
   onClose: () => void;
 }
 
@@ -30,6 +33,9 @@ export default function HotspotDeck({
   mode,
   onModeChange,
   onActiveChange,
+  plannedIds,
+  planUrl,
+  onTogglePlan,
   onClose,
 }: HotspotDeckProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -180,6 +186,22 @@ export default function HotspotDeck({
           </button>
         </div>
 
+        {plannedIds.length > 0 && planUrl && (
+          <div className="hotspot-plan-bar comic-panel mx-auto mb-3 flex w-[calc(100%-2rem)] max-w-6xl items-center justify-between gap-3 bg-black px-3 py-2.5 text-[#FFD54F] sm:w-[calc(100%-4rem)]">
+            <span className="text-[11px] font-black uppercase tracking-[0.12em]">
+              {plannedIds.length} {plannedIds.length === 1 ? "stop" : "stops"} in your plan
+            </span>
+            <a
+              href={planUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="border-2 border-[#FFD54F] bg-[#FFD54F] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] text-black transition hover:bg-[#02B0AF]"
+            >
+              Open Google Maps plan
+            </a>
+          </div>
+        )}
+
         {loading && (
           <div className="hotspot-scroller flex gap-4 overflow-hidden pb-2">
             {[0, 1, 2].map((i) => (
@@ -261,6 +283,17 @@ export default function HotspotDeck({
                         ★ {spot.rating.toFixed(1)}
                       </span>
                     )}
+                    <button
+                      type="button"
+                      className={`hotspot-card-add ${plannedIds.includes(spot.id) ? "is-added" : ""}`}
+                      aria-label={`${plannedIds.includes(spot.id) ? "Remove" : "Add"} ${spot.name} ${plannedIds.includes(spot.id) ? "from" : "to"} plan`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTogglePlan(spot);
+                      }}
+                    >
+                      {plannedIds.includes(spot.id) ? "✓" : "+"}
+                    </button>
                   </div>
                   <div className="px-3.5 py-3">
                     <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#02B0AF]">
