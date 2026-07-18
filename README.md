@@ -3,6 +3,10 @@ ignore Naming Typo
 # Kochi Metro Side Quests
 
 <p align="center">
+  <a href="https://codex-sidequest.vercel.app"><strong>Live demo →</strong></a>
+</p>
+
+<p align="center">
   <img src="images/IMG_1315-2.png" alt="beautiful face" width="200">
 </p>
 

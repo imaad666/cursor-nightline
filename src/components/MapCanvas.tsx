@@ -352,18 +352,17 @@ export default function MapCanvas() {
       );
       if (!station) return;
 
-      pendingSideQuestRef.current = plan;
+      const sameStation = selected?.id === station.id;
+      pendingSideQuestRef.current = sameStation ? null : plan;
       setPlacesRetry(0);
       setHoveredLine(null);
-      if (selected?.id === station.id) {
-        pendingSideQuestRef.current = null;
-        setRatedSpots(plan.spots);
-        setClosestSpots(plan.spots);
-        setActiveHotspotId(plan.spots[0]?.id ?? null);
-        setLoadingPlaces(false);
-        setPlacesError(null);
-        setSpotMode("rated");
-      }
+      setRatedSpots(plan.spots);
+      setClosestSpots(plan.spots);
+      setActiveHotspotId(plan.spots[0]?.id ?? null);
+      setPlannedHotspotIds([]);
+      setLoadingPlaces(false);
+      setPlacesError(null);
+      setSpotMode("rated");
       setSelected(station);
     },
     [selected],

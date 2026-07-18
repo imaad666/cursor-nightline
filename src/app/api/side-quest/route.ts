@@ -6,8 +6,9 @@ import {
 import type { Hotspot } from "@/data/hotspots";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
-const REQUEST_TIMEOUT_MS = 12000;
+const REQUEST_TIMEOUT_MS = 25000;
 const INTERESTS = [
   "any",
   "food",

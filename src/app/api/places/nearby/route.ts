@@ -12,6 +12,7 @@ import {
 } from "@/data/kochi-metro";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const PLACE_TYPE_GROUPS = [
   {
