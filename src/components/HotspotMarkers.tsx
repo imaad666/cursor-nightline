@@ -24,7 +24,7 @@ export default function HotspotMarkers({
 }: HotspotMarkersProps) {
   const map = useMap();
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const nodeRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const overlayRef = useRef<google.maps.OverlayView | null>(null);
   const hotspotsRef = useRef(hotspots);
   hotspotsRef.current = hotspots;

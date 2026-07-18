@@ -43,6 +43,10 @@ export default function SideQuestChat({
     if (openRequest > 0) setOpen(true);
   }, [openRequest]);
 
+  useEffect(() => {
+    if (selectedStationId) setOpen(false);
+  }, [selectedStationId]);
+
   const sendMessage = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = message.trim();
