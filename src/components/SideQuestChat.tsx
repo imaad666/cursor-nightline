@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Hotspot } from "@/data/hotspots";
 
 export interface SideQuestPlan {
@@ -17,6 +17,7 @@ interface ChatMessage {
 
 interface SideQuestChatProps {
   selectedStationId: string | null;
+  openRequest?: number;
   onPlan: (plan: SideQuestPlan) => void;
 }
 
@@ -28,6 +29,7 @@ const STARTER_MESSAGE: ChatMessage = {
 
 export default function SideQuestChat({
   selectedStationId,
+  openRequest = 0,
   onPlan,
 }: SideQuestChatProps) {
   const [open, setOpen] = useState(false);
@@ -36,6 +38,10 @@ export default function SideQuestChat({
   const [lastPlanUrl, setLastPlanUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (openRequest > 0) setOpen(true);
+  }, [openRequest]);
 
   const sendMessage = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -93,10 +99,10 @@ export default function SideQuestChat({
     }
   };
 
-  return (
-    if (selectedStationId) return null;
+  if (selectedStationId) return null;
 
-    return <div className={`sidequest-shell ${open ? "is-open" : ""}`}>
+  return (
+    <div className={`sidequest-shell ${open ? "is-open" : ""}`}>
       {open && (
         <section className="sidequest-panel comic-panel" aria-label="Side Quests chat">
           <header className="sidequest-header">
@@ -169,6 +175,6 @@ export default function SideQuestChat({
           Customize your own sidequest
         </button>
       )}
-    </div>;
+    </div>
   );
 }

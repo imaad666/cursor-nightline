@@ -185,6 +185,7 @@ export default function MapCanvas() {
   const [placesError, setPlacesError] = useState<string | null>(null);
   const [placesRetry, setPlacesRetry] = useState(0);
   const [hoveredLine, setHoveredLine] = useState<LineId>(null);
+  const [sideQuestOpenRequest, setSideQuestOpenRequest] = useState(0);
   const pendingSideQuestRef = useRef<SideQuestPlan | null>(null);
   const placesCacheRef = useRef(
     new globalThis.Map<
@@ -335,6 +336,15 @@ export default function MapCanvas() {
     setActiveHotspotId(hotspot.id);
   }, []);
 
+  const handleTogglePlan = useCallback((hotspot: Hotspot) => {
+    setActiveHotspotId(hotspot.id);
+    setPlannedHotspotIds((current) =>
+      current.includes(hotspot.id)
+        ? current.filter((id) => id !== hotspot.id)
+        : [...current, hotspot.id],
+    );
+  }, []);
+
   const handleSideQuestPlan = useCallback(
     (plan: SideQuestPlan) => {
       const station = ALL_MAP_STATIONS.find(
@@ -412,14 +422,16 @@ export default function MapCanvas() {
           <>
             <WalkRoutes
               station={selected}
-              hotspots={hotspots}
+              hotspots={plannedHotspots}
               activeId={activeHotspotId}
-              animationKey={`${selected.id}:${spotMode}:${hotspots.map((hotspot) => hotspot.id).join(",")}`}
+              animationKey={`${selected.id}:${spotMode}:${plannedHotspotIds.join(",")}`}
             />
             <HotspotMarkers
               hotspots={hotspots}
               activeId={activeHotspotId}
+              plannedIds={plannedHotspotIds}
               onSelect={handleHotspotSelect}
+              onTogglePlan={handleTogglePlan}
             />
           </>
         )}
@@ -443,6 +455,15 @@ export default function MapCanvas() {
             className="metro-logo-glow h-12 w-auto select-none sm:h-14"
             draggable={false}
           />
+          {!selected && (
+            <button
+              type="button"
+              className="sidequest-logo-tab comic-panel"
+              onClick={() => setSideQuestOpenRequest((value) => value + 1)}
+            >
+              Side Quests
+            </button>
+          )}
           {selected && (
             <div className="comic-panel chrome-fade-in bg-[#FFD54F] px-3.5 py-2">
               <span className="text-[11px] font-black uppercase tracking-[0.14em] text-black">
@@ -504,6 +525,7 @@ export default function MapCanvas() {
 
       <SideQuestChat
         selectedStationId={selected?.id ?? null}
+        openRequest={sideQuestOpenRequest}
         onPlan={handleSideQuestPlan}
       />
 
@@ -518,6 +540,9 @@ export default function MapCanvas() {
           mode={spotMode}
           onModeChange={handleModeChange}
           onActiveChange={handleHotspotSelect}
+          plannedIds={plannedHotspotIds}
+          planUrl={planUrl}
+          onTogglePlan={handleTogglePlan}
           onClose={handleClose}
         />
       )}

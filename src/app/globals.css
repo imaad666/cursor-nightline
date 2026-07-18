@@ -110,6 +110,29 @@ body {
     drop-shadow(0 0 22px rgba(2, 176, 175, 0.3));
 }
 
+.sidequest-logo-tab {
+  margin-top: -0.15rem;
+  background: #000;
+  padding: 0.45rem 0.7rem;
+  color: #ffd54f;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  line-height: 1;
+  text-transform: uppercase;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.sidequest-logo-tab:hover,
+.sidequest-logo-tab:focus-visible {
+  background: #ffd54f;
+  color: #000;
+  transform: translate(-2px, -2px);
+}
+
 /* —— Station markers (HTML overlay) —— */
 /* Hidden in the soft line until zoom / line touch reveals them */
 .station-node {
@@ -443,6 +466,39 @@ body {
   height: 11px;
 }
 
+.hotspot-add {
+  position: absolute;
+  top: -9px;
+  right: -10px;
+  z-index: 4;
+  display: flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #000;
+  border-radius: 999px;
+  background: #fff9d7;
+  color: #000;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 1.5px 1.5px 0 #000;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.hotspot-add:hover,
+.hotspot-add:focus-visible,
+.hotspot-add.is-added {
+  background: #02b0af;
+  color: #000;
+  transform: scale(1.12);
+}
+
 .hotspot-ping {
   position: absolute;
   left: 50%;
@@ -682,6 +738,41 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   pointer-events: none;
+}
+
+.hotspot-card-add {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 2;
+  display: flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #000;
+  border-radius: 999px;
+  background: #ffd54f;
+  color: #000;
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 2px 2px 0 #000;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease;
+}
+
+.hotspot-card-add:hover,
+.hotspot-card-add:focus-visible,
+.hotspot-card-add.is-added {
+  background: #02b0af;
+  transform: scale(1.08);
+}
+
+.hotspot-plan-bar {
+  min-height: 3rem;
 }
 
 .hotspot-card.is-active {

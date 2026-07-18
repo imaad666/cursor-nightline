@@ -3,10 +3,7 @@ import {
   ALL_MAP_STATIONS,
   stationSearchRadius,
 } from "@/data/kochi-metro";
-import {
-  mapsWalkingPlanUrl,
-  type Hotspot,
-} from "@/data/hotspots";
+import type { Hotspot } from "@/data/hotspots";
 
 export const runtime = "nodejs";
 
@@ -326,19 +323,15 @@ export async function POST(request: NextRequest) {
           openByMatches(spot, intent.openByHour),
       ),
     );
-    const planUrl = mapsWalkingPlanUrl(
-      { lat: station.lat, lng: station.lng },
-      matches,
-    );
     const assistantMessage = matches.length
-      ? `${intent.reply} I found ${matches.length} ${matches.length === 1 ? "spot" : "spots"} near ${station.name}: ${matches.map((spot) => spot.name).join(", ")}.`
+      ? `${intent.reply} I found ${matches.length} ${matches.length === 1 ? "spot" : "spots"} near ${station.name}: ${matches.map((spot) => spot.name).join(", ")}. Tap + on the spots you want in your plan.`
       : `I couldn't find a match near ${station.name} with those filters. Try widening the walk, price, or opening-time limit.`;
 
     return NextResponse.json({
       intent,
       stationId: station.id,
       spots: matches,
-      planUrl: matches.length ? planUrl : null,
+      planUrl: null,
       assistantMessage,
     });
   } catch (error) {
