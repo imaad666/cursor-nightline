@@ -8,7 +8,6 @@ import {
 } from "@/data/hotspots";
 import {
   ALL_MAP_STATIONS,
-  DEFAULT_SEARCH_RADIUS_M,
   stationSearchRadius,
 } from "@/data/kochi-metro";
 
@@ -32,6 +31,23 @@ const DATE_TYPES = [
   "amusement_center",
   "bowling_alley",
 ] as const;
+
+const REQUEST_TIMEOUT_MS = 8000;
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const RATE_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT = 30;
+
+type NearbyPayload = {
+  rated: Hotspot[];
+  closest: Hotspot[];
+  hotspots: Hotspot[];
+};
+
+const nearbyCache = new Map<
+  string,
+  { expiresAt: number; payload: NearbyPayload }
+>();
+const rateLimit = new Map<string, { startedAt: number; count: number }>();
 
 interface PlacesNearbyResponse {
   places?: Array<{
@@ -82,7 +98,7 @@ async function walkingMinutesFromRoutes(
     },
   });
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix",
     {
       method: "POST",
@@ -141,6 +157,39 @@ function scoreRated(h: Hotspot) {
   return quality + photo + walkSweet;
 }
 
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function requestKey(request: NextRequest) {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("x-real-ip") ??
+    "local"
+  );
+}
+
+function rateLimited(key: string) {
+  const now = Date.now();
+  const current = rateLimit.get(key);
+  if (!current || now - current.startedAt >= RATE_WINDOW_MS) {
+    rateLimit.set(key, { startedAt: now, count: 1 });
+    return false;
+  }
+  current.count += 1;
+  return current.count > RATE_LIMIT;
+}
+
 function belongsToStation(hotspot: Hotspot, stationId: string) {
   const operationalStations = ALL_MAP_STATIONS.filter(
     (station) => station.status === "operational",
@@ -170,26 +219,69 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const lat = Number(searchParams.get("lat"));
   const lng = Number(searchParams.get("lng"));
-  const stationId = searchParams.get("stationId") ?? "station";
-  const stationMeta = ALL_MAP_STATIONS.find((s) => s.id === stationId);
-  const requested = Number(searchParams.get("radius"));
-  const fallback = stationMeta
-    ? stationSearchRadius(stationMeta)
-    : DEFAULT_SEARCH_RADIUS_M;
-  const radius = Math.min(
-    3000,
-    Math.max(900, Number.isFinite(requested) ? requested : fallback),
+  const stationId = searchParams.get("stationId");
+  const stationMeta = ALL_MAP_STATIONS.find(
+    (station) => station.id === stationId && station.status === "operational",
   );
+  const radiusParam = searchParams.get("radius");
+  const requested = radiusParam == null ? null : Number(radiusParam);
 
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng) ||
+    lat < -90 ||
+    lat > 90 ||
+    lng < -180 ||
+    lng > 180
+  ) {
     return NextResponse.json(
-      { error: "lat and lng are required" },
+      { error: "Valid lat and lng are required" },
       { status: 400 },
     );
   }
 
+  if (!stationMeta || !stationId) {
+    return NextResponse.json(
+      { error: "A valid operational stationId is required" },
+      { status: 400 },
+    );
+  }
+
+  if (
+    radiusParam != null &&
+    (!Number.isInteger(requested) || requested < 900 || requested > 3000)
+  ) {
+    return NextResponse.json(
+      { error: "radius must be an integer between 900 and 3000" },
+      { status: 400 },
+    );
+  }
+
+  if (distanceMetersBetween({ lat, lng }, stationMeta) > 100) {
+    return NextResponse.json(
+      { error: "Coordinates must match the selected station" },
+      { status: 400 },
+    );
+  }
+
+  const radius = requested ?? stationSearchRadius(stationMeta);
+  const cacheKey = `${stationId}:${radius}`;
+  const cached = nearbyCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return NextResponse.json(cached.payload, {
+      headers: { "Cache-Control": "private, max-age=300" },
+    });
+  }
+
+  if (rateLimited(requestKey(request))) {
+    return NextResponse.json(
+      { error: "Too many nearby-place requests. Try again shortly." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       "https://places.googleapis.com/v1/places:searchNearby",
       {
         method: "POST",
@@ -221,7 +313,7 @@ export async function GET(request: NextRequest) {
             },
           },
         }),
-        next: { revalidate: 3600 },
+        cache: "no-store",
       },
     );
 
@@ -327,11 +419,21 @@ export async function GET(request: NextRequest) {
       })
       .slice(0, 5);
 
-    return NextResponse.json({
+    const payload: NearbyPayload = {
       rated,
       closest,
       // Back-compat for anything still reading hotspots
       hotspots: rated,
+    };
+    nearbyCache.set(cacheKey, {
+      expiresAt: Date.now() + CACHE_TTL_MS,
+      payload,
+    });
+
+    return NextResponse.json(payload, {
+      headers: {
+        "Cache-Control": "private, max-age=300, stale-while-revalidate=600",
+      },
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
