@@ -178,6 +178,7 @@ export default function MapCanvas() {
   const [spotMode, setSpotMode] = useState<SpotMode>("rated");
   const [ratedSpots, setRatedSpots] = useState<Hotspot[]>([]);
   const [closestSpots, setClosestSpots] = useState<Hotspot[]>([]);
+  const [allSpots, setAllSpots] = useState<Hotspot[]>([]);
   const [activeHotspotId, setActiveHotspotId] = useState<string | null>(null);
   const [loadingPlaces, setLoadingPlaces] = useState(false);
   const [placesError, setPlacesError] = useState<string | null>(null);
@@ -190,6 +191,7 @@ export default function MapCanvas() {
         expiresAt: number;
         rated: Hotspot[];
         closest: Hotspot[];
+        all: Hotspot[];
       }
     >(),
   );
@@ -200,6 +202,7 @@ export default function MapCanvas() {
     if (!selected) {
       setRatedSpots([]);
       setClosestSpots([]);
+      setAllSpots([]);
       setActiveHotspotId(null);
       setPlacesError(null);
       setLoadingPlaces(false);
@@ -213,6 +216,7 @@ export default function MapCanvas() {
     if (cached && cached.expiresAt > Date.now() && placesRetry === 0) {
       setRatedSpots(cached.rated);
       setClosestSpots(cached.closest);
+      setAllSpots(cached.all);
       setActiveHotspotId(cached.rated[0]?.id ?? cached.closest[0]?.id ?? null);
       setLoadingPlaces(false);
       setPlacesError(null);
@@ -236,6 +240,7 @@ export default function MapCanvas() {
         const data = (await res.json()) as {
           rated?: Hotspot[];
           closest?: Hotspot[];
+          all?: Hotspot[];
           hotspots?: Hotspot[];
           error?: string;
         };
@@ -243,16 +248,19 @@ export default function MapCanvas() {
         return {
           rated: data.rated ?? data.hotspots ?? [],
           closest: data.closest ?? data.hotspots ?? [],
+          all: data.all ?? data.rated ?? data.hotspots ?? [],
         };
       })
-      .then(({ rated, closest }) => {
+      .then(({ rated, closest, all }) => {
         placesCacheRef.current.set(cacheKey, {
           expiresAt: Date.now() + PLACES_CACHE_TTL_MS,
           rated,
           closest,
+          all,
         });
         setRatedSpots(rated);
         setClosestSpots(closest);
+        setAllSpots(all);
         setActiveHotspotId(rated[0]?.id ?? closest[0]?.id ?? null);
         setLoadingPlaces(false);
       })
@@ -280,6 +288,7 @@ export default function MapCanvas() {
     setSelected(null);
     setRatedSpots([]);
     setClosestSpots([]);
+    setAllSpots([]);
     setActiveHotspotId(null);
     setPlacesError(null);
     setSpotMode("rated");
